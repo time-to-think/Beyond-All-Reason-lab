@@ -19,6 +19,11 @@ def inspect_run(directory, require_finished=False, allow_mock=False):
         problems.append('Expected exactly one bridge start')
     if starts and starts[0].get('mock') and not allow_mock:
         problems.append('Mock run is not an actual model match')
+    if errors:
+        problems.append('Model request errors occurred')
+    strategy_errors = [e for e in events if e['kind'] == 'strategy_error']
+    if strategy_errors:
+        problems.append('Strategy request errors occurred')
     if not snapshots:
         problems.append('No game observations received')
     if require_finished and len(results)!=1:
@@ -37,6 +42,12 @@ def inspect_run(directory, require_finished=False, allow_mock=False):
     budget=starts[0]['config']['max_calls_per_team'] if starts else 0
     if any(n>budget for n in counts.values()):
         problems.append('Model call budget exceeded')
+    if starts and (starts[0]['config'].get('hybrid_enabled') or starts[0]['config'].get('local_council_enabled')):
+        strategies = [e for e in events if e['kind'] == 'strategy']
+        if not strategies:
+            problems.append('No local strategy results')
+        if len(strategies)+len(strategy_errors) > starts[0]['config'].get('max_strategy_calls', 45) * (2 if starts[0]['config'].get('local_council_enabled') else 1):
+            problems.append('Strategy call budget exceeded')
     states=[state for event in snapshots for state in event['teams']]
     if any(state.get('queued_total',0)>9 for state in states):
         problems.append('Factory queue exceeds limit')

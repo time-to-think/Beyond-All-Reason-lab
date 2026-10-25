@@ -14,6 +14,7 @@
 /agent/__pycache__/
 /tests/__pycache__/
 /launcher/__pycache__/
+/maps/__pycache__/
 /.venv/
 /output/
 /tmp/

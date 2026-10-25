@@ -41,15 +41,36 @@ def link_directory(link, target):
 
 
 def validate_config(config):
+    if config.get('hybrid_enabled') and config.get('local_council_enabled'):
+        raise ValueError('Select local council or JEV hybrid, not both')
+    if not isinstance(config.get('map_name', 'Comet Catcher Remake'), str) or not re.fullmatch(r'[A-Za-z0-9_ .-]{1,100}', config.get('map_name', 'Comet Catcher Remake')):
+        raise ValueError('Invalid map name')
+    if type(config.get('seed', 42)) is not int or not 0 <= config.get('seed', 42) < 2147483648:
+        raise ValueError('Invalid seed')
+    positions = config.get('start_positions')
+    if positions is not None and (not isinstance(positions, list) or len(positions) != 2 or
+            any(not isinstance(point, list) or len(point) != 2 or any(type(v) not in (int, float) or not 32 <= v <= 32000 for v in point) for point in positions)):
+        raise ValueError('Invalid start positions')
     port = config.get('port')
     duration = config.get('match_minutes')
     if type(port) is not int or not 1024 <= port <= 65535:
         raise ValueError('Invalid port in config')
     if type(duration) not in (int, float) or not 0 < duration <= 1440:
         raise ValueError('Invalid match duration in config')
-    for field in ('local_model', 'cloud_model'):
+    for field in ('local_model', 'cloud_model', *(['jev_model'] if config.get('hybrid_enabled') else [])):
         if not isinstance(config.get(field), str) or not re.fullmatch(r'[A-Za-z0-9_.:/@-]+', config[field]):
             raise ValueError(f'Invalid model name: {field}')
+
+    if config.get('hybrid_enabled') or config.get('local_council_enabled'):
+        for field in ('strategy_interval_seconds', 'tactical_interval_seconds',
+                      'reaction_interval_seconds', 'tactical_timeout_seconds'):
+            value = config.get(field)
+            if type(value) not in (int, float) or not 0 < value <= 3600:
+                raise ValueError(f'Invalid hybrid timing: {field}')
+        for field in ('max_calls_per_team', 'max_strategy_calls', 'command_max_age_frames'):
+            value = config.get(field)
+            if type(value) is not int or not 1 <= value <= 100000:
+                raise ValueError(f'Invalid hybrid limit: {field}')
 
 
 def stop_process(process):
@@ -64,12 +85,14 @@ def stop_process(process):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    for flag in ('headless', 'hidden', 'mock', 'prepare-only'):
+    for flag in ('headless', 'hidden', 'mock', 'prepare-only', 'pack-core'):
         parser.add_argument('--' + flag, action='store_true')
     parser.add_argument('--test-seconds', type=int, default=0)
     parser.add_argument('--load-timeout', type=int, default=300,
                         help='Additional wall-clock seconds for test loading (default: 300)')
     parser.add_argument('--config', type=Path, default=ROOT / 'agent/config.json')
+    parser.add_argument('--map', choices=('baseline', 'ridge', 'river'))
+    parser.add_argument('--swap-starts', action='store_true')
     parser.add_argument('--runtime-root', type=Path, default=default_runtime())
     parser.add_argument('--data-dir', type=Path)
     parser.add_argument('--engine-dir', type=Path)
@@ -92,23 +115,50 @@ def main(argv=None):
         raise ValueError(f'Recoil executable missing: {executable}. Set --engine-dir.')
     config_path = args.config.expanduser().resolve(strict=True)
     config = json.loads(config_path.read_text('utf-8-sig'))
+    sys.path.insert(0, str(ROOT / 'maps'))
+    from build_maps import build_all, SPECS
+    if args.map in SPECS:
+        config.update(map_name=SPECS[args.map]['name'], start_positions=SPECS[args.map]['starts'])
+    elif args.map == 'baseline':
+        config['map_name'] = 'Comet Catcher Remake'
+    if args.swap_starts:
+        if not config.get('start_positions'):
+            raise ValueError('Swapping requires explicit start_positions for this map')
+        config['start_positions'] = list(reversed(config['start_positions']))
     validate_config(config)
+    if config.get('hybrid_enabled') and not args.mock and not args.prepare_only:
+        if not os.environ.get('TYPESAFE_API_KEY', '').strip():
+            raise ValueError('JEV key missing. Run Setup-JEV-and-Start.cmd after obtaining a TypeSafe API key.')
     runtime = args.runtime_root.expanduser().resolve()
     if runtime == ROOT or ROOT in runtime.parents:
         raise ValueError('Runtime directory must be outside the source checkout')
-    content, cache = runtime / 'content-lab-v2', runtime / 'cache'
+    content, cache = runtime / ('content-lab-v3-packed' if args.pack_core else 'content-lab-v3'), runtime / 'cache'
     cache.mkdir(parents=True, exist_ok=True)
-    for name, target in {'maps': data / 'maps', 'base': engine / 'base', 'fonts': engine / 'fonts',
-                         'games/BAR.sdd': core, 'games/LLMDuel.sdd': ROOT / 'game-extension'}.items():
+    build_all(runtime / 'generated-maps')
+    for name, target in {'maps/installed': data / 'maps', 'maps/lab': runtime / 'generated-maps', 'base': engine / 'base', 'fonts': engine / 'fonts',
+                         'games/LLMDuel.sdd': ROOT / 'game-extension'}.items():
         link_directory(content / name, target)
+    if args.pack_core:
+        from pack_core import pack_core
+        pack_core(core, content / 'games/BAR.sdz')
+    else:
+        link_directory(content / 'games/BAR.sdd', core)
     run = runtime / (datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3))
     run.mkdir(mode=0o700)
     link_directory(run / 'cache', cache)
+    config_path = run / 'config.json'
+    config_path.write_text(json.dumps(config, indent=2), encoding='utf-8')
     token = secrets.token_hex(32)
-    (run / 'session.json').write_text(json.dumps({'token': token}), encoding='utf-8')
+    (run / 'session.json').write_text(json.dumps({'token': token, 'test_run': bool(args.test_seconds)}), encoding='utf-8')
     start = (ROOT / 'launcher/startscript.template').read_text('utf-8')
-    substitutions = {'TOKEN': token, 'PORT': config['port'], 'LOCAL_MODEL': config['local_model'],
-                     'CLOUD_MODEL': config['cloud_model'], 'FRAMES': int(config['match_minutes'] * 1800),
+    positions = config.get('start_positions', [[1200,1200],[6800,6800]])
+    substitutions = {'MAP_NAME': config.get('map_name', 'Comet Catcher Remake'),
+                     'SEED': config.get('seed',42), 'START_TYPE': 3 if config.get('start_positions') else 0,
+                     'START_X0': positions[0][0], 'START_Z0': positions[0][1],
+                     'START_X1': positions[1][0], 'START_Z1': positions[1][1],
+                     'TOKEN': token, 'PORT': config['port'], 'LOCAL_MODEL': config['local_model'],
+                     'LOCAL_LABEL': 'Local_Council' if config.get('local_council_enabled') else ('Local_JEV' if config.get('hybrid_enabled') else 'Local'),
+                     'CLOUD_MODEL': config['cloud_model'], 'MAX_AGE': config.get('command_max_age_frames', 2700), 'FRAMES': int(config['match_minutes'] * 1800),
                      'DEBUG': f'llm_duel_test_exit=1; debugcommands={args.test_seconds * 30}:quitforce;' if args.test_seconds else ''}
     for key, value in substitutions.items():
         start = start.replace('{{' + key + '}}', str(value))
@@ -144,6 +194,7 @@ def main(argv=None):
             command.append('--hidden')
         with (run / 'engine-console.log').open('w') as out, (run / 'engine-errors.log').open('w') as err:
             game = subprocess.Popen(command, cwd=run, stdout=out, stderr=err,
+                                    env={k: v for k, v in os.environ.items() if k != "TYPESAFE_API_KEY"},
                                     **(hidden if args.hidden or args.headless else {}))
         try:
             code = game.wait(timeout=args.test_seconds + args.load_timeout if args.test_seconds else None)

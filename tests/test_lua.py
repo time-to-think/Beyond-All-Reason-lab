@@ -16,7 +16,7 @@ units, resources, queues = {}, {[0]=1500,[1]=1500}, {}
 nextID=10
 options={llm_duel="1",llm_duel_token="test",llm_duel_frames="27000"}
 Game={mapSizeX=8192,mapSizeZ=8192}
-CMD={FIGHT=16}
+CMD={FIGHT=16,MOVE=10}
 UnitDefs={}
 UnitDefNames={}
 for i,name in ipairs({"armcom","armvp","armflash","armstump","armfav","armap","armfig","armthund","armkam","armpeep","armsam"}) do
@@ -63,7 +63,7 @@ class ArenaTests(unittest.TestCase):
         self.lua.globals().Json = self.lua.execute((CORE / 'common/luaUtilities/json.lua').read_text())
         self.lua.execute(HARNESS)
         self.lua.execute((EXTENSION / 'luarules/gadgets/ai_llm_duel.lua').read_text())
-        self.lua.execute('gadget:GameFrame(30); frame=150')
+        self.lua.execute('gadget:GameFrame(30); payloads={}; frame=150')
 
     def run_lua(self, source):
         return self.lua.execute(source)
@@ -76,6 +76,27 @@ class ArenaTests(unittest.TestCase):
 
     def test_equal_starting_armies(self):
         self.assertEqual(self.run_lua('return #Spring.GetTeamUnits(0),#Spring.GetTeamUnits(1)'), (9,9))
+
+    def test_secondly_observation_includes_commander_and_army(self):
+        self.run_lua('gadget:GameFrame(60)')
+        observation = json.loads(self.lua.globals().payloads[1])['teams'][0]
+        self.assertEqual(observation['commander']['health'], 100)
+        self.assertEqual(observation['commander']['id'], 1)
+        self.assertEqual(len(observation['own_units']), 6)
+        self.assertIn('command', observation['own_units'][0])
+
+    def test_retreat_moves_commander_and_army_but_not_factories(self):
+        self.command(action='retreat', x=.1, z=.2)
+        self.assertEqual(self.run_lua('return #orders,orders[7].id,orders[7].cmd'), (7,1,10))
+        self.assertAlmostEqual(self.run_lua('return orders[7].args[1]'), 819.2)
+        self.run_lua('frame=180; orders={}')
+        self.command(action='hold', frame=180)
+        self.assertEqual(self.run_lua('return #orders'), 0)
+
+    def test_hybrid_short_expiry(self):
+        self.run_lua('options.llm_command_max_age="150"; frame=330')
+        self.command(frame=150)
+        self.assertEqual(self.run_lua('return #orders'), 0)
 
     def test_all_aircraft_route_to_air_factory_and_join_orders(self):
         for i,unit in enumerate(('fighter','bomber','gunship','airscout')):

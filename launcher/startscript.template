@@ -1,13 +1,13 @@
 [GAME]
 {
- MapName=Comet Catcher Remake;
+ MapName={{MAP_NAME}};
  GameType=BAR LLM Duel 1;
  GameStartDelay=0;
- StartPosType=0;
+ StartPosType={{START_TYPE}};
  RecordDemo=1;
  MyPlayerName=DuelObserver;
  IsHost=1;
- FixedRNGSeed=42;
+ FixedRNGSeed={{SEED}};
  NumPlayers=1;
  NumUsers=1;
  HostIP=127.0.0.1;
@@ -19,16 +19,18 @@
   llm_duel_token={{TOKEN}};
   llm_duel_port={{PORT}};
   llm_local_model={{LOCAL_MODEL}};
+  llm_local_label={{LOCAL_LABEL}};
   llm_cloud_model={{CLOUD_MODEL}};
   llm_duel_frames={{FRAMES}};
+  llm_command_max_age={{MAX_AGE}};
   deathmode=com;
   {{DEBUG}}
  }
  [ALLYTEAM0] { NumAllies=0; StartRectLeft=0; StartRectTop=0; StartRectRight=0.3; StartRectBottom=0.3; }
  [ALLYTEAM1] { NumAllies=0; StartRectLeft=0.7; StartRectTop=0.7; StartRectRight=1; StartRectBottom=1; }
- [TEAM0] { Side=Armada; AllyTeam=0; TeamLeader=0; StartPosX=1200; StartPosZ=1200; RGBColor=0.2 0.7 1; }
- [TEAM1] { Side=Armada; AllyTeam=1; TeamLeader=0; StartPosX=6800; StartPosZ=6800; RGBColor=1 0.3 0.2; }
- [AI0] { Host=0; Name=Local_Qwen35; ShortName=LLM Duel Local; Team=0; IsFromDemo=0; }
+ [TEAM0] { Side=Armada; AllyTeam=0; TeamLeader=0; StartPosX={{START_X0}}; StartPosZ={{START_Z0}}; RGBColor=0.2 0.7 1; }
+ [TEAM1] { Side=Armada; AllyTeam=1; TeamLeader=0; StartPosX={{START_X1}}; StartPosZ={{START_Z1}}; RGBColor=1 0.3 0.2; }
+ [AI0] { Host=0; Name={{LOCAL_LABEL}}; ShortName=LLM Duel Local; Team=0; IsFromDemo=0; }
  [AI1] { Host=0; Name=Cloud_GPTOSS120; ShortName=LLM Duel Cloud; Team=1; IsFromDemo=0; }
  [PLAYER0] { Name=DuelObserver; Team=0; Spectator=1; IsFromDemo=0; }
 }

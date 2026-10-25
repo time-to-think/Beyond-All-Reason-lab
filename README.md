@@ -1,6 +1,6 @@
 # Beyond-All-Reason lab
 
-Personal BAR AI experiments comparing local Qwen3.5 4B and Ollama Cloud GPT-OSS 120B in the same bounded strategy scenario. This is an experimental wrapper, not a complete autonomous BAR player.
+Personal BAR AI experiments comparing a three-role local Qwen3.5 4B council with Ollama Cloud GPT-OSS 120B in the same bounded strategy scenario. The local agents share a persistent scratchpad; JEV is disabled by default. This is an experimental wrapper, not a complete autonomous BAR player.
 
 | Path | Purpose |
 | --- | --- |
@@ -23,9 +23,12 @@ Use Python 3.12+. Install a compatible native Recoil build, base files, fonts, C
 
 The launcher uses Python with Windows junctions and POSIX symbolic links. Native macOS/Linux game execution still requires validation on those platforms.
 
+- [Generated maps and map pilot](maps/README.md)
+- [Local council and scratchpad](docs/LOCAL_COUNCIL.md)
 - [Usage](docs/USAGE.md)
 - [Repository workflow](docs/REPOSITORY_WORKFLOW.md)
 - [Validation](docs/VALIDATION.md)
+- [Two-map pilot results](docs/MAP_PILOT_RESULTS.md)
 - [AI candidates and evaluation plan](docs/AI_RESEARCH.md)
 
 ## Development

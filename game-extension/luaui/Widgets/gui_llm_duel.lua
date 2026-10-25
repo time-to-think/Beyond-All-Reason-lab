@@ -67,7 +67,7 @@ function widget:Update(dt)
 		end
 	end
 	elapsed = elapsed + dt
-	if outgoing == "" and elapsed >= 0.5 then
+	if outgoing == "" and elapsed >= 0.1 then
 		elapsed = 0
 		local value = { kind = "poll" }
 		if finalPayload or pending then
@@ -103,7 +103,7 @@ function widget:Update(dt)
 			for _, c in ipairs(data.commands or {}) do
 				c.token = token
 				Spring.SendLuaRulesMsg("BARDUEL: " .. json.encode(c))
-				label = (c.team == 0 and "LOCAL" or "CLOUD") .. ": " .. c.action .. " / " .. c.unit
+				label = (c.team == 0 and tostring(opts.llm_local_label or "LOCAL") or "CLOUD") .. ": " .. c.action .. " / " .. c.unit
 				Spring.Echo("BAR_DUEL_RECEIVED team=" .. c.team .. " action=" .. c.action)
 			end
 		end
@@ -117,7 +117,7 @@ end
 function widget:DrawScreen()
 	local _, h = Spring.GetViewGeometry()
 	gl.Text(
-		"LLM DUEL | Local: "
+		"LLM DUEL | " .. tostring(opts.llm_local_label or "Local") .. ": "
 			.. tostring(opts.llm_local_model or "local")
 			.. " | Cloud: "
 			.. tostring(opts.llm_cloud_model or "cloud"),

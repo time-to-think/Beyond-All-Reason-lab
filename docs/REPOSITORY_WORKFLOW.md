@@ -5,15 +5,18 @@
 | canonical game | `beyond-all-reason/Beyond-All-Reason` |
 | upstream team game | `time-to-think/Beyond-All-Reason` |
 | origin personal game fork | `mangman4/Beyond-All-Reason` |
-| personal experiment lab | `mangman4/Beyond-All-Reason-lab` |
+| upstream team experiment lab | `time-to-think/Beyond-All-Reason-lab` |
+| origin personal experiment lab fork | `mangman4/Beyond-All-Reason-lab` |
 
-The lab's `origin` points to the lab. The canonical/upstream/origin game workflow applies in a separate game checkout. No team lab remote is configured until the team designates one. Do not send lab changes to the team game repository.
+The lab's `origin` points to the personal lab fork and `upstream` points to the team lab. The default push remote is `origin`. The canonical/upstream/origin game workflow applies in a separate game checkout; the lab has no separate canonical game remote. Do not send lab changes to the team game repository.
 
 The `Beyond-All-Reason/` submodule consumes a pinned team game commit. Keep it detached and clean during experiments. Personal Lua loads through a dependent game archive and is never copied into the game source.
 
 ## Personal changes
 
 Create a `codex/` branch, modify the lab, test, inspect staged paths, and push to the lab's origin. Exclude credentials, session files, weights, binaries, meeting notes, and unrelated work. Documents, comments, and commit messages must be English.
+
+Open a PR from `mangman4/Beyond-All-Reason-lab:<branch>` to `time-to-think/Beyond-All-Reason-lab:master` for team review. Do not push directly to the team default branch. Fetch `upstream` to obtain reviewed lab changes. The team lab was established by transferring the existing standalone lab and forking it back to the personal account, preserving the existing commits and development branch.
 
 ## Shared game changes
 

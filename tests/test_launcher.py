@@ -20,7 +20,7 @@ class LauncherTests(unittest.TestCase):
         bridge = importlib.util.module_from_spec(bridge_spec)
         bridge_spec.loader.exec_module(bridge)
         before = (ROOT / 'agent/config.json').read_bytes()
-        with patch.object(sys, 'argv', ['bridge.py', '--probe']), patch.object(bridge, 'chat', return_value=({}, {})) as chat:
+        with patch.object(sys, 'argv', ['bridge.py', '--probe']), patch.object(bridge, 'chat', return_value=({}, {})) as chat, patch.object(bridge.jev, 'require_key'), patch.object(bridge.jev, 'choose', return_value=({}, {})):
             with self.assertRaises(SystemExit) as result:
                 bridge.main()
         self.assertEqual(result.exception.code, 0)
@@ -45,6 +45,15 @@ class LauncherTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 launcher.validate_config(dict(config, match_minutes=duration))
 
+    def test_map_configuration_rejects_script_injection(self):
+        config = json.loads((ROOT / 'agent/config.json').read_text())
+        for name in ('map;deathmode=none;', 'map\nother=1', ''):
+            with self.assertRaises(ValueError):
+                launcher.validate_config(dict(config, map_name=name))
+        for positions in ([[1,2]], [[100,200],[float('nan'),300]], [[100,200],['x',300]]):
+            with self.assertRaises(ValueError):
+                launcher.validate_config(dict(config, start_positions=positions))
+
     def test_preparation_and_link_conflict(self):
         with tempfile.TemporaryDirectory(prefix='bar launcher ') as directory:
             base = Path(directory)
@@ -53,7 +62,7 @@ class LauncherTests(unittest.TestCase):
             args = ['--prepare-only', '--data-dir', str(base / 'data'), '--engine-dir', str(base / 'recoil'),
                     '--runtime-root', str(base / 'runtime')]
             self.assertEqual(launcher.main(args), 0)
-            content = base / 'runtime/content-lab-v2'
+            content = base / 'runtime/content-lab-v3'
             self.assertEqual((content / 'games/BAR.sdd').resolve(), ROOT / 'Beyond-All-Reason')
             script = next((base / 'runtime').glob('*/startscript.txt')).read_text()
             self.assertNotIn('{{', script)
@@ -61,7 +70,7 @@ class LauncherTests(unittest.TestCase):
             wrong = base / 'wrong'
             wrong.mkdir()
             with self.assertRaises(ValueError):
-                launcher.link_directory(content / 'maps', wrong)
+                launcher.link_directory(content / 'maps/installed', wrong)
 
     def test_does_not_replace_existing_real_directory(self):
         with tempfile.TemporaryDirectory() as directory:

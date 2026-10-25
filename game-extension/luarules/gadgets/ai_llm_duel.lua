@@ -138,7 +138,7 @@ function gadget:GameFrame(frame)
 		finish(-1, frame)
 		return
 	end
-	if frame % 150 ~= 0 then
+	if frame % 30 ~= 0 then
 		return
 	end
 	local states = {}
@@ -151,7 +151,8 @@ function gadget:GameFrame(frame)
 			if los and los.los and #enemies < 40 then
 				local x, _, z = Spring.GetUnitPosition(id)
 				enemies[#enemies + 1] = {
-					unit = UnitDefs[Spring.GetUnitDefID(id)].name,
+					id = id,
+                    unit = UnitDefs[Spring.GetUnitDefID(id)].name,
 					x = x / Game.mapSizeX,
 					z = z / Game.mapSizeZ,
 				}
@@ -162,6 +163,24 @@ function gadget:GameFrame(frame)
 		local airFactory = airFactories[team]
 		local airQueue, airTotal = productionQueue(airFactory)
 		local unitCounts, readyCounts = {}, {}
+        local ownUnits, commander = {}, nil
+        for _, id in ipairs(Spring.GetTeamUnits(team)) do
+            local d = UnitDefs[Spring.GetUnitDefID(id)]
+            if d and (controlledTypes[d.name] or d.customParams.iscommander) then
+                local x, _, z = Spring.GetUnitPosition(id)
+                local hp, maxHP, _, _, progress = Spring.GetUnitHealth(id)
+                local command = Spring.GetUnitCurrentCommand and Spring.GetUnitCurrentCommand(id)
+                local observation = { id = id, unit = d.name, x = x / Game.mapSizeX,
+                    z = z / Game.mapSizeZ, health = hp, max_health = maxHP,
+                    build_progress = progress, command = command or 0,
+                    command_name = command == CMD.FIGHT and "fight" or (command == CMD.MOVE and "move" or "other_or_idle") }
+                if d.customParams.iscommander then
+                    commander = observation
+                elseif #ownUnits < 100 then
+                    ownUnits[#ownUnits + 1] = observation
+                end
+            end
+        end
 		for _, id in ipairs(army(team)) do
 			local name = UnitDefs[Spring.GetUnitDefID(id)].name
 			unitCounts[name] = (unitCounts[name] or 0) + 1
@@ -172,6 +191,8 @@ function gadget:GameFrame(frame)
 		end
 		states[#states + 1] = {
 			team = team,
+            map = Game.mapName or "unknown",
+            map_size = {x = Game.mapSizeX, z = Game.mapSizeZ},
 			frame = frame,
 			metal = math.floor(metal or 0),
 			energy = math.floor(energy or 0),
@@ -183,7 +204,9 @@ function gadget:GameFrame(frame)
 			air_factory_alive = airFactory and Spring.ValidUnitID(airFactory) or false,
 			air_factory_queue = airQueue,
 			air_queued_total = airTotal,
-			unit_counts = unitCounts,
+			commander = commander,
+            own_units = ownUnits,
+            unit_counts = unitCounts,
 			ready_unit_counts = readyCounts,
 			base = { x = bases[team].x / Game.mapSizeX, z = bases[team].z / Game.mapSizeZ },
 			enemy_base = { x = bases[1 - team].x / Game.mapSizeX, z = bases[1 - team].z / Game.mapSizeZ },
@@ -206,7 +229,7 @@ function gadget:RecvLuaMsg(message, player)
 		return
 	end
 	local frame = Spring.GetGameFrame()
-	if c.frame <= lastCommand[t] or frame - c.frame > 2700 or c.frame > frame then
+	if c.frame <= lastCommand[t] or frame - c.frame > (tonumber(opts.llm_command_max_age) or 2700) or c.frame > frame then
 		return
 	end
 	lastCommand[t] = c.frame
@@ -229,19 +252,26 @@ function gadget:RecvLuaMsg(message, player)
 		if upgrades[t] < 5 and Spring.UseTeamResource(t, "m", 300) then
 			upgrades[t] = upgrades[t] + 1
 		end
-	elseif c.action == "attack" or c.action == "defend" then
+	elseif c.action == "attack" or c.action == "defend" or c.action == "retreat" then
 		local x, z = bases[t].x, bases[t].z
-		if c.action == "attack" then
+		if c.action == "attack" or c.action == "retreat" then
 			if type(c.x) ~= "number" or type(c.z) ~= "number" or c.x ~= c.x or c.z ~= c.z then
 				return
 			end
 			x = math.max(32, math.min(Game.mapSizeX - 32, c.x * Game.mapSizeX))
 			z = math.max(32, math.min(Game.mapSizeZ - 32, c.z * Game.mapSizeZ))
 		end
-		for _, id in ipairs(army(t)) do
-			Spring.GiveOrderToUnit(id, CMD.FIGHT, { x, Spring.GetGroundHeight(x, z), z }, {})
+        local ids = army(t)
+        if c.action == "retreat" then
+            for _, id in ipairs(Spring.GetTeamUnits(t)) do
+                local d = UnitDefs[Spring.GetUnitDefID(id)]
+                if d and d.customParams.iscommander then ids[#ids + 1] = id end
+            end
+        end
+        for _, id in ipairs(ids) do
+			Spring.GiveOrderToUnit(id, c.action == "retreat" and CMD.MOVE or CMD.FIGHT, { x, Spring.GetGroundHeight(x, z), z }, {})
 		end
-	else
+	elseif c.action ~= "hold" then
 		return
 	end
 	Spring.Echo("BAR_DUEL_ACTION team=" .. t .. " action=" .. c.action)

@@ -34,3 +34,46 @@ Historical development commits remain in the personal game fork and its archive 
 
 - Final actual-model graphical run `20261021-114103-6bf131`: draw at frame 900 (30 game seconds), five snapshots, two valid decisions and two applied commands per team, zero model errors, engine exit zero. The result-required auditor passed. The local model produced units; the cloud model attacked. Local measured latency was 1.078 seconds; cloud 0.640-1.000 seconds. These are short smoke-test observations, not a benchmark.
 - The bridge port 18765 had no listener after the match. Both CMD and legacy PowerShell preparation entry points exited successfully.
+
+
+## Local council validation (2026-10-22)
+
+- 54 Python/Lua regression tests pass, including independent tactical scheduling,
+  threat invalidation, commander retreat, three-role notes, next-match memory
+  loading, mock isolation, test-run persistence exclusion, and cloud Choice parsing.
+- The first real council smoke test (30 seconds) exercised all three roles and
+  saved nine scratchpad entries, but the cloud controller rejected two outputs
+  that did not exactly match the offered action objects.
+- A subsequent 45-second test exposed conflicting legacy action-format instructions
+  inside the new Choice request. These instructions were removed from role input;
+  the adapter now builds a single unambiguous Choice contract and maps identifiers
+  to the shared action objects. Both actual models then returned valid Choice outputs
+  in isolated checks. Neither failed run establishes controller quality.
+- JEV has not been authenticated or called live. Its adapter has contract tests only
+  and is disabled in the default configuration. No TypeSafe purchase was made.
+
+- Final engine integration run: `20261022-194133-7ae34d`, actual models, 45 game
+  seconds, normal engine exit, 44 snapshots, 13 tactical decisions per side,
+  zero model errors, and 17 scratchpad entries covering all three local roles.
+  The configured time limit produced a draw; this is a plumbing check, not a
+  win-rate result. The run auditor passed and test-run memory persistence was off.
+- That run exposed excessive local holding. Afterwards the role prompt removed
+  a hold-specific example and explicitly discouraged idling without visible threats.
+  Replaying the same real initial observation produced valid attack suggestions
+  from strategy/tactics in about 1.4 seconds. The economy advisor was then restricted
+  to production/investment/hold, and its live replay selected production in 1.16 seconds.
+  Unit-role descriptions explicitly distinguish anti-air fighters from ground attack.
+  These final prompt refinements have replay/contract validation, not another full
+  engine match. Longer matches and repeated performance comparisons remain pending.
+
+## Native map pilot (2026-10-24)
+
+- Added two original, deterministic native maps: Ridge Pass and Twin Crossings.
+- 60 Python/Lua tests passed. Both maps completed actual-model games in both
+  physical start assignments; all three baseline/new-map position swaps verified.
+- Six games exited normally. Four audits passed; baseline/reversed had two cloud
+  JSON parsing errors and river/reversed had one. These runs remain flagged.
+- Strategy/economy consultations and saved scratchpads were present in every run.
+  Source hashes stayed fixed and previous-match memory was excluded.
+- This is a short compatibility/behavior pilot, not evidence of learned terrain
+  adaptation or a reliable win rate. See [full results](MAP_PILOT_RESULTS.md).
