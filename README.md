@@ -14,7 +14,7 @@ Personal BAR AI experiments comparing local Qwen3.5 4B and Ollama Cloud GPT-OSS 
 ## Setup
 
 ```sh
-git clone --filter=blob:none --recurse-submodules https://github.com/mangman4/Beyond-All-Reason-lab.git
+git clone --filter=blob:none --recurse-submodules https://github.com/time-to-think/Beyond-All-Reason-lab.git
 cd Beyond-All-Reason-lab
 python launcher/start_duel.py --data-dir /path/to/BAR/data --engine-dir /path/to/recoil
 ```
